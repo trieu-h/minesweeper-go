@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"strconv"
 
@@ -17,17 +18,16 @@ const (
 	GRID_HEIGHT = 4
 	CELL_WIDTH  = 5
 	CELL_HEIGHT = CELL_WIDTH / 2
+	BOMB_COUNT  = 4
 )
 
 const (
-	UNOPENED        State = 0
-	NUMBERED        State = 1
-	BLANK           State = 2
-	FLAGGED         State = 3
-	QUESTION_MARKED State = 4
+	UNOPENED State = 0
+	OPENED   State = 1
 )
 
 const (
+	BLANK Value = 0
 	ONE   Value = 1
 	TWO   Value = 2
 	THREE Value = 3
@@ -107,24 +107,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "enter":
 			if m.activeCell.state == UNOPENED {
-				if !isBomb(m.activeCell) {
-					m.activeCell.state = NUMBERED
-				}
+				m.activeCell.state = OPENED
 			}
 
 		default:
-			panic("Not handled yet")
+			fmt.Printf("%s key is not handled yet!\n", msg.String())
 		}
 	}
 
 	return m, nil
-}
-
-func isBomb(c *Cell) bool {
-	if 1 <= c.value && c.value <= 8 {
-		return false
-	}
-	return true
 }
 
 func (m *Model) View() string {
@@ -161,29 +152,81 @@ func renderCell(m *Model, x int, y int) string {
 	if cell.state == UNOPENED {
 		style.Background(lipgloss.Color("63"))
 		s = style.Render()
-	} else if cell.state == NUMBERED {
+	} else if cell.state == OPENED {
 		style.UnsetBackground()
-		s = style.Render(strconv.Itoa(int(cell.value)))
+
+		if cell.value == BOMB {
+			s = style.Render("Bomb!")
+		} else {
+			s = style.Render(strconv.Itoa(int(cell.value)))
+		}
 	}
 
 	return s
 }
 
-func initState(w int, h int) *Model {
+func initGame() *Model {
 	var cells [][]Cell
 
-	for x := 0; x < w; x++ {
+	// Init cells
+	for x := 0; x < GRID_HEIGHT; x++ {
 		var row []Cell
 
-		for y := 0; y < h; y++ {
+		for y := 0; y < GRID_WIDTH; y++ {
 			cell := Cell{
 				state: UNOPENED,
-				value: ONE,
 				pos:   Pos{x: x, y: y},
+				value: BLANK,
 			}
 			row = append(row, cell)
 		}
 		cells = append(cells, row)
+	}
+
+	// Start placing bombs
+	bombCount := BOMB_COUNT
+	for bombCount > 0 {
+		rx := rand.Intn(GRID_HEIGHT)
+		ry := rand.Intn(GRID_WIDTH)
+
+		if cells[rx][ry].value != BOMB {
+			cells[rx][ry].value = BOMB
+			bombCount = bombCount - 1
+		}
+	}
+
+	// Calculate the value of each cells
+	for x := 0; x < GRID_HEIGHT; x++ {
+		for y := 0; y < GRID_WIDTH; y++ {
+			if cells[x][y].value == BOMB {
+				continue
+			}
+
+			numberOfBomb := 0
+			for xc := x - 1; xc <= x+1; xc++ {
+				// Check for out of bounds
+				if xc < 0 || xc > GRID_HEIGHT-1 {
+					continue
+				}
+				for yc := y - 1; yc <= y+1; yc++ {
+					// Check for out of bounds
+					if yc < 0 || yc > GRID_WIDTH-1 {
+						continue
+					}
+
+					// Exclude current cell
+					if xc == x && yc == y {
+						continue
+					}
+
+					if cells[xc][yc].value == BOMB {
+						numberOfBomb++
+					}
+				}
+			}
+
+			cells[x][y].value = Value(numberOfBomb)
+		}
 	}
 
 	return &Model{
@@ -193,7 +236,8 @@ func initState(w int, h int) *Model {
 }
 
 func main() {
-	p := tea.NewProgram(initState(GRID_WIDTH, GRID_HEIGHT))
+	g := initGame()
+	p := tea.NewProgram(g)
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
