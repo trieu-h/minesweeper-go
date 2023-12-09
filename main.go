@@ -12,18 +12,24 @@ import (
 
 type State int
 type Value int
+type Status int
 
 const (
-	GRID_WIDTH  = 4
-	GRID_HEIGHT = 4
-	CELL_WIDTH  = 5
-	CELL_HEIGHT = CELL_WIDTH / 2
-	BOMB_COUNT  = 4
+	GRID_WIDTH  = 8
+	GRID_HEIGHT = 8
+	BOMB_COUNT  = 8
 )
 
 const (
 	UNOPENED State = 0
 	OPENED   State = 1
+	FLAGGED  State = 2
+)
+
+const (
+	PLAYING Status = 0
+	WIN     Status = 1
+	LOSE    Status = 2
 )
 
 const (
@@ -53,6 +59,11 @@ type Cell struct {
 type Model struct {
 	cells      [][]Cell
 	activeCell *Cell
+	bombCells  []*Cell
+	status     Status
+
+	termHeight int
+	termWidth  int
 }
 
 func (m Model) Init() tea.Cmd {
@@ -75,6 +86,10 @@ func max(a int, b int) int {
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.termHeight = msg.Height
+		m.termWidth = msg.Width
+
 	case tea.KeyMsg:
 		switch msg.String() {
 
@@ -106,16 +121,51 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.activeCell = &m.cells[newX][curY]
 
 		case "enter":
-			if m.activeCell.state == UNOPENED {
-				m.activeCell.state = OPENED
-			}
+			m.revealOneCell(m.activeCell)
 
-		default:
-			fmt.Printf("%s key is not handled yet!\n", msg.String())
+		case " ":
+			if m.activeCell.state == UNOPENED {
+				m.activeCell.state = FLAGGED
+			} else if m.activeCell.state == FLAGGED {
+				m.activeCell.state = UNOPENED
+			}
 		}
 	}
 
 	return m, nil
+}
+
+func (m *Model) revealOneCell(cell *Cell) {
+	var x = cell.pos.x
+	var y = cell.pos.y
+
+	if cell.state == UNOPENED {
+		cell.state = OPENED
+
+		if cell.value == BLANK {
+			for xc := x - 1; xc <= x+1; xc++ {
+				if xc < 0 || xc > GRID_HEIGHT-1 {
+					continue
+				}
+
+				for yc := y - 1; yc <= y+1; yc++ {
+					if yc < 0 || yc > GRID_WIDTH-1 {
+						continue
+					}
+
+					m.revealOneCell(&m.cells[xc][yc])
+				}
+			}
+		}
+
+		if cell.value == BOMB {
+			m.status = LOSE
+
+			for _, bomb := range m.bombCells {
+				bomb.state = OPENED
+			}
+		}
+	}
 }
 
 func (m *Model) View() string {
@@ -125,7 +175,7 @@ func (m *Model) View() string {
 		var thisRow []string
 
 		for y := 0; y < GRID_HEIGHT; y++ {
-			thisRow = append(thisRow, renderCell(m, x, y))
+			thisRow = append(thisRow, m.renderCell(x, y))
 		}
 
 		allRows = append(allRows, lipgloss.JoinHorizontal(0, thisRow...))
@@ -134,13 +184,14 @@ func (m *Model) View() string {
 	return lipgloss.JoinVertical(0, allRows...)
 }
 
-func renderCell(m *Model, x int, y int) string {
-	var cell = &m.cells[x][y]
+func (m *Model) renderCell(x int, y int) string {
+	var cell = m.cells[x][y]
 
 	var style = lipgloss.NewStyle().
-		Width(CELL_WIDTH).
-		Height(CELL_HEIGHT).
-		UnsetPadding().
+		Width(7).
+		PaddingTop(1).
+		PaddingBottom(1).
+		Align(lipgloss.Center).
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("63"))
 
@@ -152,11 +203,20 @@ func renderCell(m *Model, x int, y int) string {
 	if cell.state == UNOPENED {
 		style.Background(lipgloss.Color("63"))
 		s = style.Render()
+	} else if cell.state == FLAGGED {
+		style.UnsetBackground()
+		s = style.Render("Flagged")
 	} else if cell.state == OPENED {
 		style.UnsetBackground()
 
 		if cell.value == BOMB {
+			if m.status == LOSE {
+				style.Background(lipgloss.Color("#FF0000"))
+			}
+
 			s = style.Render("Bomb!")
+		} else if cell.value == BLANK {
+			s = style.Render("")
 		} else {
 			s = style.Render(strconv.Itoa(int(cell.value)))
 		}
@@ -185,12 +245,15 @@ func initGame() *Model {
 
 	// Start placing bombs
 	bombCount := BOMB_COUNT
+	bombCells := []*Cell{}
+
 	for bombCount > 0 {
 		rx := rand.Intn(GRID_HEIGHT)
 		ry := rand.Intn(GRID_WIDTH)
 
 		if cells[rx][ry].value != BOMB {
 			cells[rx][ry].value = BOMB
+			bombCells = append(bombCells, &cells[rx][ry])
 			bombCount = bombCount - 1
 		}
 	}
@@ -229,15 +292,18 @@ func initGame() *Model {
 		}
 	}
 
+	fmt.Println(bombCells)
 	return &Model{
 		cells:      cells,
 		activeCell: &cells[1][1],
+		status:     PLAYING,
+		bombCells:  bombCells,
 	}
 }
 
 func main() {
 	g := initGame()
-	p := tea.NewProgram(g)
+	p := tea.NewProgram(g, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
