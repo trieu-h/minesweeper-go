@@ -1,28 +1,50 @@
 package main
 
 import (
-	"strconv"
-
 	"github.com/charmbracelet/lipgloss"
+)
+
+const (
+	PanelBorderColor        = lipgloss.Color("#ffffff")
+	TextColor               = lipgloss.Color("#ffffff")
+	ActiveBorderColor       = lipgloss.Color("#00ff00")
+	CellBackgroundColor     = lipgloss.Color("#bdb2ff")
+	BombCellBackgroundColor = lipgloss.Color("#ff0000")
+	BombColor               = lipgloss.Color("#000000")
+	FlagColor               = lipgloss.Color("#ff0000")
+)
+
+var (
+	textStyle = lipgloss.NewStyle().
+			Foreground(TextColor).
+			Bold(true)
+
+	panelStyle = lipgloss.NewStyle().
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderForeground(PanelBorderColor).
+			Align(lipgloss.Center)
+
+	cellStyle = lipgloss.NewStyle().
+			Width(7).
+			Padding(1, 0).
+			Align(lipgloss.Center).
+			BorderStyle(lipgloss.ThickBorder()).
+			Bold(true)
 )
 
 func (m *Model) View() string {
 	tutorial := lipgloss.JoinVertical(
 		lipgloss.Left,
-		"Up arrow - Move up",
-		"Down arrow - Move down",
-		"Left arrow - Move left",
-		"Right arrow - Move right",
-		"Enter - Reveal a cell",
-		"Space - Flag a cell",
-		"R - Restart",
+		textStyle.Render("Up arrow - Move up"),
+		textStyle.Render("Down arrow - Move down"),
+		textStyle.Render("Left arrow - Move left"),
+		textStyle.Render("Right arrow - Move right"),
+		textStyle.Render("Enter - Reveal a cell"),
+		textStyle.Render("Space - Flag a cell"),
+		textStyle.Render("R - Restart"),
 	)
 
-	leftPanel := lipgloss.NewStyle().
-		Padding(1, 2).
-		Border(lipgloss.NormalBorder()).
-		Align(lipgloss.Center).
-		Render(tutorial)
+	leftPanel := panelStyle.Copy().Padding(1, 2).Render(tutorial)
 
 	var allRows []string
 
@@ -38,53 +60,67 @@ func (m *Model) View() string {
 
 	board := lipgloss.JoinVertical(0, allRows...)
 
-	rightPanel := lipgloss.NewStyle().
-		Width(lipgloss.Width(board)).
-		Align(lipgloss.Center).
-		Border(lipgloss.NormalBorder()).
-		Render(board)
+	rightPanel := panelStyle.Copy().Width(lipgloss.Width(board)).Render(board)
 
-	game := lipgloss.JoinHorizontal(0, leftPanel, rightPanel)
+	gui := lipgloss.JoinHorizontal(0, leftPanel, rightPanel)
 
-	return lipgloss.Place(m.termWidth, m.termHeight, 0.6, lipgloss.Center, game)
+	return lipgloss.Place(m.termWidth, m.termHeight, 0.6, lipgloss.Center, gui)
 }
 
 func (m *Model) renderCell(x int, y int) string {
 	var cell = m.cells[x][y]
-
-	var style = lipgloss.NewStyle().
-		Width(7).
-		Padding(1, 0).
-		Align(lipgloss.Center).
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("63"))
+	var cellStyle = cellStyle.Copy()
+	var string = ""
 
 	if &m.cells[x][y] == m.activeCell {
-		style.BorderForeground(lipgloss.Color("50"))
+		cellStyle.BorderForeground(ActiveBorderColor)
 	}
 
-	var s string
 	if cell.state == UNOPENED {
-		style.Background(lipgloss.Color("63"))
-		s = style.Render()
-	} else if cell.state == FLAGGED {
-		style.UnsetBackground()
-		s = style.Render("Flagged")
-	} else if cell.state == OPENED {
-		style.UnsetBackground()
+		cellStyle.Background(CellBackgroundColor)
+	}
+
+	if cell.state == FLAGGED {
+		string = "🚩"
+		cellStyle.UnsetBackground().Foreground(FlagColor)
+	}
+
+	if cell.state == OPENED {
+		string = convertValueToText(cell.value)
 
 		if cell.value == BOMB {
-			if m.status == LOSE {
-				style.Background(lipgloss.Color("#FF0000"))
-			}
-
-			s = style.Render("Bomb!")
-		} else if cell.value == BLANK {
-			s = style.Render("")
+			cellStyle.Background(BombCellBackgroundColor).Foreground(BombColor)
 		} else {
-			s = style.Render(strconv.Itoa(int(cell.value)))
+			cellStyle.UnsetBackground()
 		}
 	}
 
-	return s
+	return cellStyle.Render(string)
+}
+
+func convertValueToText(v Value) string {
+	switch v {
+	case BLANK:
+		return ""
+	case ONE:
+		return "1"
+	case TWO:
+		return "2"
+	case THREE:
+		return "3"
+	case FOUR:
+		return "4"
+	case FIVE:
+		return "5"
+	case SIX:
+		return "6"
+	case SEVEN:
+		return "7"
+	case EIGHT:
+		return "8"
+	case BOMB:
+		return "💣"
+	default:
+		panic("Should not happen")
+	}
 }
