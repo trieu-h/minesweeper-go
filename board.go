@@ -34,13 +34,13 @@ var (
 func (m *Model) View() string {
 	tutorial := lipgloss.JoinVertical(
 		lipgloss.Left,
-		renderTutorialText("Up arrow", "Move up"),
-		renderTutorialText("Down arrow", "Move down"),
-		renderTutorialText("Left arrow", "Move left"),
-		renderTutorialText("Right arrow", "Move right"),
-		renderTutorialText("Enter", "Reveal a cell"),
-		renderTutorialText("Space", "Flag a cell"),
-		renderTutorialText("R", "Restart"),
+		lipgloss.NewStyle().MarginBottom(1).Render(tutorialText("Up arrow", "Move up")),
+		lipgloss.NewStyle().MarginBottom(1).Render(tutorialText("Down arrow", "Move down")),
+		lipgloss.NewStyle().MarginBottom(1).Render(tutorialText("Left arrow", "Move left")),
+		lipgloss.NewStyle().MarginBottom(1).Render(tutorialText("Right arrow", "Move right")),
+		lipgloss.NewStyle().MarginBottom(1).Render(tutorialText("Enter", "Reveal a cell")),
+		lipgloss.NewStyle().MarginBottom(1).Render(tutorialText("Space", "Flag a cell")),
+		tutorialText("R", "Restart"),
 	)
 
 	leftPanel := panelStyle.Copy().Padding(1, 2).MarginRight(3).Render(tutorial)
@@ -59,14 +59,14 @@ func (m *Model) View() string {
 
 	board := lipgloss.JoinVertical(0, allRows...)
 
-	rightPanel := panelStyle.Copy().Width(lipgloss.Width(board)).Render(board)
+	rightPanel := panelStyle.Copy().Padding(0, 2).Render(board)
 
 	gui := lipgloss.JoinHorizontal(0, leftPanel, rightPanel)
 
 	return lipgloss.Place(m.termWidth, m.termHeight, 0.6, lipgloss.Center, gui)
 }
 
-func renderTutorialText(key string, instruction string) string {
+func tutorialText(key string, instruction string) string {
 	return lipgloss.JoinHorizontal(
 		lipgloss.Left,
 		textStyle.Copy().Bold(true).Render(key),

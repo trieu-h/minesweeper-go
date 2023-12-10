@@ -13,7 +13,7 @@ type Status int
 const (
 	GRID_WIDTH  = 10
 	GRID_HEIGHT = 8
-	BOMB_COUNT  = 8
+	BOMB_COUNT  = 15
 )
 
 const (
@@ -117,7 +117,30 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.activeCell = &m.cells[newX][curY]
 
 		case "enter":
-			m.revealOneCell(m.activeCell)
+			if m.status == LOSE {
+				return m, nil
+			}
+
+			if m.activeCell.state == UNOPENED {
+				m.revealCell(m.activeCell)
+			} else if m.activeCell.state == OPENED {
+				var x = m.activeCell.pos.x
+				var y = m.activeCell.pos.y
+
+				for xc := x - 1; xc <= x+1; xc++ {
+					if xc < 0 || xc > GRID_HEIGHT-1 {
+						continue
+					}
+
+					for yc := y - 1; yc <= y+1; yc++ {
+						if yc < 0 || yc > GRID_WIDTH-1 {
+							continue
+						}
+
+						m.revealCell(&m.cells[xc][yc])
+					}
+				}
+			}
 
 		case " ":
 			if m.activeCell.state == UNOPENED {
@@ -134,7 +157,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Model) revealOneCell(cell *Cell) {
+func (m *Model) revealCell(cell *Cell) {
 	var x = cell.pos.x
 	var y = cell.pos.y
 
@@ -152,7 +175,7 @@ func (m *Model) revealOneCell(cell *Cell) {
 						continue
 					}
 
-					m.revealOneCell(&m.cells[xc][yc])
+					m.revealCell(&m.cells[xc][yc])
 				}
 			}
 		}
