@@ -48,10 +48,10 @@ func (m *Model) View() string {
 
 	var allRows []string
 
-	for x := 0; x < GRID_WIDTH; x++ {
+	for x := 0; x < GRID_HEIGHT; x++ {
 		var thisRow []string
 
-		for y := 0; y < GRID_HEIGHT; y++ {
+		for y := 0; y < GRID_WIDTH; y++ {
 			thisRow = append(thisRow, m.renderCell(x, y))
 		}
 

@@ -11,7 +11,7 @@ type Value int
 type Status int
 
 const (
-	GRID_WIDTH  = 8
+	GRID_WIDTH  = 10
 	GRID_HEIGHT = 8
 	BOMB_COUNT  = 8
 )
