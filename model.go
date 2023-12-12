@@ -11,9 +11,10 @@ type Value int
 type Status int
 
 const (
-	GRID_WIDTH  = 10
-	GRID_HEIGHT = 8
-	BOMB_COUNT  = 15
+	GRID_WIDTH  = 13
+	GRID_HEIGHT = 7
+	BOMB_COUNT  = (GRID_WIDTH * GRID_HEIGHT) / 4
+	// BOMB_COUNT = 1
 )
 
 const (
@@ -80,11 +81,11 @@ func max(a int, b int) int {
 	return a
 }
 
+// TODO: Add mouse support
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.termHeight = msg.Height
-		m.termWidth = msg.Width
+		m.termHeight, m.termWidth = msg.Height, msg.Width
 
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -92,25 +93,25 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "q":
 			return m, tea.Quit
 
-		case "left":
+		case "left", "a":
 			newY := min(m.activeCell.pos.y-1, 0)
 			curX := m.activeCell.pos.x
 
 			m.activeCell = &m.cells[curX][newY]
 
-		case "right":
+		case "right", "d":
 			newY := max(m.activeCell.pos.y+1, GRID_WIDTH-1)
 			curX := m.activeCell.pos.x
 
 			m.activeCell = &m.cells[curX][newY]
 
-		case "up":
+		case "up", "w":
 			newX := min(m.activeCell.pos.x-1, 0)
 			curY := m.activeCell.pos.y
 
 			m.activeCell = &m.cells[newX][curY]
 
-		case "down":
+		case "down", "s":
 			newX := max(m.activeCell.pos.x+1, GRID_HEIGHT-1)
 			curY := m.activeCell.pos.y
 
@@ -143,6 +144,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case " ":
+			if m.status == LOSE {
+				return m, nil
+			}
+
 			if m.activeCell.state == UNOPENED {
 				m.activeCell.state = FLAGGED
 			} else if m.activeCell.state == FLAGGED {
@@ -209,6 +214,7 @@ func (m *Model) new() {
 	}
 
 	// Start placing bombs
+	// TODO: Maybe we should start placing the bombs after the player first move
 	bombCount := BOMB_COUNT
 	bombCells := []*Cell{}
 
@@ -258,7 +264,7 @@ func (m *Model) new() {
 	}
 
 	m.cells = cells
-	m.activeCell = &cells[1][1]
+	m.activeCell = &cells[GRID_HEIGHT/2][GRID_WIDTH/2]
 	m.status = PLAYING
 	m.bombCells = bombCells
 }
