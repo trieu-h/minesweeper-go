@@ -10,7 +10,11 @@ import (
 func main() {
 	game := &Model{}
 	game.new()
-	p := tea.NewProgram(game, tea.WithAltScreen())
+
+	// opts := []tea.ProgramOption{tea.WithAltScreen()}
+	opts := []tea.ProgramOption{}
+
+	p := tea.NewProgram(game, opts...)
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)

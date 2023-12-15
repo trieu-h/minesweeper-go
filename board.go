@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -33,7 +35,9 @@ var (
 		"\n\n" +
 		tutorialText("SPACE", "Flag a cell") +
 		"\n\n" +
-		tutorialText("R", "Restart")
+		tutorialText("R", "Restart") +
+		"\n\n" +
+		tutorialText("Q", "Quit")
 )
 
 var (
@@ -48,17 +52,22 @@ var (
 				Inherit(baseStyle).
 				Foreground(SecondaryTextColor)
 
+	scoreTextStyle = lipgloss.NewStyle().
+			Inherit(baseStyle).
+			Foreground(lipgloss.Color("#d3869b"))
+
 	panelStyle = lipgloss.NewStyle().
 			Inherit(baseStyle).
+			MarginBackground(BackgroundColor).
 			BorderBackground(BackgroundColor).
 			BorderForeground(PanelBorderColor).
-			BorderStyle(lipgloss.NormalBorder()).
-			Align(lipgloss.Left)
+			BorderStyle(lipgloss.NormalBorder())
 
 	cellStyle = lipgloss.NewStyle().
-			Width(7).
-			Padding(1, 0).
-			Align(lipgloss.Center).
+			Width(3).
+			Height(1).
+			AlignHorizontal(lipgloss.Center).
+			AlignVertical(lipgloss.Center).
 			BorderStyle(lipgloss.ThickBorder()).
 			BorderForeground(CellBorderColor).
 			BorderBackground(BackgroundColor).
@@ -67,22 +76,51 @@ var (
 
 	termStyle = lipgloss.NewStyle().
 			Inherit(baseStyle).
-			AlignHorizontal(lipgloss.Center).
-			AlignVertical(lipgloss.Center)
+			AlignVertical(lipgloss.Center).
+			AlignHorizontal(lipgloss.Center)
 )
+
+func makeGap(n int) string {
+	s := ""
+
+	for i := 0; i < n; i++ {
+		s += " "
+	}
+
+	return s
+}
 
 func (m *Model) View() string {
 	board := m.board()
 
-	leftPanel := panelStyle.Copy().Padding(1, 2).MarginRight(2).MarginBackground(BackgroundColor).Render(tutorial)
+	tutorialPanel := panelStyle.Copy().Padding(1, 2).Render(tutorial)
 
-	rightPanel := panelStyle.Copy().Padding(0, 2).Render(board)
+	scorePanel := m.scorePanel()
+
+	leftPanel := lipgloss.JoinVertical(lipgloss.Top, tutorialPanel, scorePanel)
+
+	rightPanel := panelStyle.Copy().Padding(0, 1).Render(board)
 
 	ui := lipgloss.JoinHorizontal(0, leftPanel, rightPanel)
 
 	term := termStyle.Width(m.termWidth).Height(m.termHeight)
 
 	return term.Render(ui)
+}
+
+func (m *Model) scorePanel() string {
+	w := lipgloss.Width
+
+	bombText := fmt.Sprintf("%d", m.bombCounter)
+
+	clockText := "00:00"
+
+	gap := primaryTextStyle.Render(makeGap(w(tutorial) - w(clockText) - w(bombText)))
+
+	return panelStyle.Copy().Padding(1, 2).Render(
+		scoreTextStyle.Render(bombText) +
+			gap +
+			scoreTextStyle.Render(clockText))
 }
 
 func (m *Model) board() string {
@@ -120,7 +158,7 @@ func (m *Model) renderCell(x int, y int) string {
 	}
 
 	if cell.state == FLAGGED {
-		content = "🚩"
+		content = "⚑"
 		cellStyle.Foreground(FlagColor)
 		cellStyle.Bold(true)
 	}
@@ -161,7 +199,7 @@ func getCell(v Value) (string, string) {
 	case EIGHT:
 		return "8", "#b16286"
 	case BOMB:
-		return "💣", ""
+		return "💣", "#000000"
 	default:
 		panic("Should not happen")
 	}

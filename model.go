@@ -12,9 +12,8 @@ type Status int
 
 const (
 	GRID_WIDTH  = 13
-	GRID_HEIGHT = 7
+	GRID_HEIGHT = 10
 	BOMB_COUNT  = (GRID_WIDTH * GRID_HEIGHT) / 4
-	// BOMB_COUNT = 1
 )
 
 const (
@@ -54,10 +53,11 @@ type Cell struct {
 }
 
 type Model struct {
-	cells      [][]Cell
-	activeCell *Cell
-	bombCells  []*Cell
-	status     Status
+	cells       [][]Cell
+	activeCell  *Cell
+	bombCells   []*Cell
+	status      Status
+	bombCounter int
 
 	termHeight int
 	termWidth  int
@@ -89,7 +89,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch msg.String() {
-
 		case "ctrl+c", "q":
 			return m, tea.Quit
 
@@ -118,30 +117,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.activeCell = &m.cells[newX][curY]
 
 		case "enter":
-			if m.status == LOSE {
-				return m, nil
-			}
-
-			if m.activeCell.state == UNOPENED {
-				m.revealCell(m.activeCell)
-			} else if m.activeCell.state == OPENED {
-				var x = m.activeCell.pos.x
-				var y = m.activeCell.pos.y
-
-				for xc := x - 1; xc <= x+1; xc++ {
-					if xc < 0 || xc > GRID_HEIGHT-1 {
-						continue
-					}
-
-					for yc := y - 1; yc <= y+1; yc++ {
-						if yc < 0 || yc > GRID_WIDTH-1 {
-							continue
-						}
-
-						m.revealCell(&m.cells[xc][yc])
-					}
-				}
-			}
+			m.onEnter()
 
 		case " ":
 			if m.status == LOSE {
@@ -150,12 +126,43 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			if m.activeCell.state == UNOPENED {
 				m.activeCell.state = FLAGGED
+				m.bombCounter--
 			} else if m.activeCell.state == FLAGGED {
 				m.activeCell.state = UNOPENED
+				m.bombCounter++
 			}
 
 		case "r":
 			m.new()
+		}
+	}
+
+	return m, nil
+}
+
+func (m *Model) onEnter() (tea.Model, tea.Cmd) {
+	if m.status == LOSE {
+		return m, nil
+	}
+
+	if m.activeCell.state == UNOPENED {
+		m.revealCell(m.activeCell)
+	} else if m.activeCell.state == OPENED {
+		var x = m.activeCell.pos.x
+		var y = m.activeCell.pos.y
+
+		for xc := x - 1; xc <= x+1; xc++ {
+			if xc < 0 || xc > GRID_HEIGHT-1 {
+				continue
+			}
+
+			for yc := y - 1; yc <= y+1; yc++ {
+				if yc < 0 || yc > GRID_WIDTH-1 {
+					continue
+				}
+
+				m.revealCell(&m.cells[xc][yc])
+			}
 		}
 	}
 
@@ -205,7 +212,7 @@ func (m *Model) new() {
 		for y := 0; y < GRID_WIDTH; y++ {
 			cell := Cell{
 				state: UNOPENED,
-				pos:   Pos{x: x, y: y},
+				pos:   Pos{x, y},
 				value: BLANK,
 			}
 			row = append(row, cell)
@@ -267,4 +274,5 @@ func (m *Model) new() {
 	m.activeCell = &cells[GRID_HEIGHT/2][GRID_WIDTH/2]
 	m.status = PLAYING
 	m.bombCells = bombCells
+	m.bombCounter = BOMB_COUNT
 }
