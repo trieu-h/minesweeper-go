@@ -2,6 +2,7 @@ package main
 
 import (
 	"math/rand"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -23,9 +24,10 @@ const (
 )
 
 const (
-	PLAYING Status = 0
-	WIN     Status = 1
-	LOSE    Status = 2
+	NEW  Status = 0
+	PLAY Status = 1
+	WIN  Status = 2
+	LOSE Status = 3
 )
 
 const (
@@ -53,18 +55,29 @@ type Cell struct {
 }
 
 type Model struct {
-	cells       [][]Cell
-	activeCell  *Cell
-	bombCells   []*Cell
-	status      Status
-	bombCounter int
+	cells        [][]Cell
+	activeCell   *Cell
+	bombCells    []*Cell
+	status       Status
+	bombCounter  int
+	timer        int
+	timerStarted bool
 
 	termHeight int
 	termWidth  int
 }
 
-func (m Model) Init() tea.Cmd {
+func (m *Model) Init() tea.Cmd {
 	return nil
+}
+
+type TimerMsg struct{}
+
+func timerCmd() tea.Msg {
+	for {
+		time.Sleep(1 * time.Second)
+		return TimerMsg{}
+	}
 }
 
 func min(a int, b int) int {
@@ -84,6 +97,14 @@ func max(a int, b int) int {
 // TODO: Add mouse support
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case TimerMsg:
+		if m.status == LOSE || m.status == NEW {
+			return m, nil
+		} else {
+			m.timer++
+			return m, timerCmd
+		}
+
 	case tea.WindowSizeMsg:
 		m.termHeight, m.termWidth = msg.Height, msg.Width
 
@@ -117,7 +138,38 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.activeCell = &m.cells[newX][curY]
 
 		case "enter":
-			m.onEnter()
+			if m.status == LOSE {
+				return m, nil
+			}
+
+			if m.activeCell.state == UNOPENED {
+				m.revealCell(m.activeCell)
+			} else if m.activeCell.state == OPENED {
+				var x = m.activeCell.pos.x
+				var y = m.activeCell.pos.y
+
+				for xc := x - 1; xc <= x+1; xc++ {
+					if xc < 0 || xc > GRID_HEIGHT-1 {
+						continue
+					}
+
+					for yc := y - 1; yc <= y+1; yc++ {
+						if yc < 0 || yc > GRID_WIDTH-1 {
+							continue
+						}
+
+						m.revealCell(&m.cells[xc][yc])
+					}
+				}
+			}
+
+			if !m.timerStarted {
+				m.timerStarted = true
+				m.status = PLAY
+				return m, timerCmd
+			} else {
+				return m, nil
+			}
 
 		case " ":
 			if m.status == LOSE {
@@ -134,35 +186,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "r":
 			m.new()
-		}
-	}
-
-	return m, nil
-}
-
-func (m *Model) onEnter() (tea.Model, tea.Cmd) {
-	if m.status == LOSE {
-		return m, nil
-	}
-
-	if m.activeCell.state == UNOPENED {
-		m.revealCell(m.activeCell)
-	} else if m.activeCell.state == OPENED {
-		var x = m.activeCell.pos.x
-		var y = m.activeCell.pos.y
-
-		for xc := x - 1; xc <= x+1; xc++ {
-			if xc < 0 || xc > GRID_HEIGHT-1 {
-				continue
-			}
-
-			for yc := y - 1; yc <= y+1; yc++ {
-				if yc < 0 || yc > GRID_WIDTH-1 {
-					continue
-				}
-
-				m.revealCell(&m.cells[xc][yc])
-			}
 		}
 	}
 
@@ -272,7 +295,9 @@ func (m *Model) new() {
 
 	m.cells = cells
 	m.activeCell = &cells[GRID_HEIGHT/2][GRID_WIDTH/2]
-	m.status = PLAYING
+	m.status = NEW
 	m.bombCells = bombCells
 	m.bombCounter = BOMB_COUNT
+	m.timer = 0
+	m.timerStarted = false
 }

@@ -113,7 +113,7 @@ func (m *Model) scorePanel() string {
 
 	bombText := fmt.Sprintf("%d", m.bombCounter)
 
-	clockText := "00:00"
+	clockText := fmt.Sprintf("%d", m.timer)
 
 	gap := primaryTextStyle.Render(makeGap(w(tutorial) - w(clockText) - w(bombText)))
 
