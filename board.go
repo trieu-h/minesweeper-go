@@ -23,17 +23,17 @@ const (
 )
 
 var (
-	tutorial = tutorialText("↑/W", "Move up") +
+	tutorial = tutorialText("↑ / W", "Move up") +
 		"\n\n" +
-		tutorialText("↓/S", "Move down") +
+		tutorialText("↓ / S", "Move down") +
 		"\n\n" +
-		tutorialText("←/A", "Move left") +
+		tutorialText("← / A", "Move left") +
 		"\n\n" +
-		tutorialText("→/D", "Move right") +
+		tutorialText("→ / D", "Move right") +
 		"\n\n" +
-		tutorialText("ENTER/LeftM", "Reveal cell") +
+		tutorialText("↩ / Left Mouse", "Reveal cell") +
 		"\n\n" +
-		tutorialText("SPACE/RightM", "Flag cell") +
+		tutorialText("␣ / Right Mouse", "Flag cell") +
 		"\n\n" +
 		tutorialText("R", "Restart") +
 		"\n\n" +
@@ -165,7 +165,7 @@ func tutorialText(key string, instruction string) string {
 	return lipgloss.JoinHorizontal(
 		lipgloss.Left,
 		primaryTextStyle.Copy().Bold(true).Render(key),
-		primaryTextStyle.Copy().Render(" "),
+		primaryTextStyle.Copy().Render(" - "),
 		secondaryTextStyle.Copy().Italic(true).Render(instruction),
 	)
 }
