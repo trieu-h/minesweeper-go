@@ -15,7 +15,7 @@ const (
 	SecondaryTextColor      = lipgloss.Color("#a89984")
 	ActiveBorderColor       = lipgloss.Color("#8ec07c")
 	CellEmptyColor          = lipgloss.Color("#1d2021")
-	CellBackgroundColor     = lipgloss.Color("#fbf1c7")
+	CellBackgroundColor     = lipgloss.Color("#bdae93")
 	CellBorderColor         = lipgloss.Color("#d5c4a1")
 	BombCellBackgroundColor = lipgloss.Color("#cc241d")
 	BombColor               = lipgloss.Color("#282828")
@@ -23,17 +23,17 @@ const (
 )
 
 var (
-	tutorial = tutorialText("↑ / W", "Move up") +
+	tutorial = tutorialText("↑/W", "Move up") +
 		"\n\n" +
-		tutorialText("↓ / S", "Move down") +
+		tutorialText("↓/S", "Move down") +
 		"\n\n" +
-		tutorialText("← / A", "Move left") +
+		tutorialText("←/A", "Move left") +
 		"\n\n" +
-		tutorialText("→ / D", "Move right") +
+		tutorialText("→/D", "Move right") +
 		"\n\n" +
-		tutorialText("ENTER", "Reveal a cell") +
+		tutorialText("ENTER/LeftM", "Reveal cell") +
 		"\n\n" +
-		tutorialText("SPACE", "Flag a cell") +
+		tutorialText("SPACE/RightM", "Flag cell") +
 		"\n\n" +
 		tutorialText("R", "Restart") +
 		"\n\n" +
@@ -91,36 +91,58 @@ func makeGap(n int) string {
 }
 
 func (m *Model) View() string {
-	board := m.board()
-
-	tutorialPanel := panelStyle.Copy().Padding(1, 2).Render(tutorial)
-
-	scorePanel := m.scorePanel()
-
-	leftPanel := lipgloss.JoinVertical(lipgloss.Top, tutorialPanel, scorePanel)
-
-	rightPanel := panelStyle.Copy().Padding(0, 1).Render(board)
-
-	ui := lipgloss.JoinHorizontal(0, leftPanel, rightPanel)
-
-	term := termStyle.Width(m.termWidth).Height(m.termHeight)
-
-	return term.Render(ui)
-}
-
-func (m *Model) scorePanel() string {
 	w := lipgloss.Width
+	h := lipgloss.Height
+	leftPanelMarginRight := 1
+	leftPanelStyle := panelStyle.Copy().Padding(1, 2).MarginRight(leftPanelMarginRight)
 
+	// Tutorial panel
+	tutorialPanel := leftPanelStyle.Render(tutorial)
+
+	// Score panel
 	bombText := fmt.Sprintf("%d", m.bombCounter)
 
 	clockText := fmt.Sprintf("%d", m.timer)
 
 	gap := primaryTextStyle.Render(makeGap(w(tutorial) - w(clockText) - w(bombText)))
 
-	return panelStyle.Copy().Padding(1, 2).Render(
-		scoreTextStyle.Render(bombText) +
-			gap +
-			scoreTextStyle.Render(clockText))
+	scorePanel := leftPanelStyle.Render(scoreTextStyle.Render(bombText) + gap + scoreTextStyle.Render(clockText))
+
+	// Left panel
+	leftPanel := lipgloss.JoinVertical(lipgloss.Top, tutorialPanel, scorePanel)
+
+	// Board
+	board := m.board()
+
+	// Right panel
+	rightPanelPadding := 1
+	rightPanel := panelStyle.Copy().Padding(0, rightPanelPadding).Render(board)
+
+	// Calculate coords for each cell
+	// TODO: Check if can move to a different function
+	paddingHorz := (m.termWidth - (w(leftPanel) + w(rightPanel))) / 2
+
+	paddingVer := (m.termHeight - (h(rightPanel))) / 2
+
+	// Top left cell X coordinate, to get the top left cell border we need to add 1
+	X := paddingHorz + w(leftPanel) + leftPanelMarginRight + rightPanelPadding + 1
+
+	// Top right cell Y coordinate, panel border accounts for 1 and top left cell border accounts for the other 1
+	Y := paddingVer + 2
+
+	for x := 0; x < GRID_HEIGHT; x++ {
+		for y := 0; y < GRID_WIDTH; y++ {
+			// [W] -> A cell will have its own width + 2 for each border
+			m.cells[x][y].coords.x = X + ((CELL_WIDTH + 2) * y)
+			m.cells[x][y].coords.y = Y + ((CELL_HEIGHT + 2) * x)
+		}
+	}
+
+	ui := lipgloss.JoinHorizontal(0, leftPanel, rightPanel)
+
+	term := termStyle.Width(m.termWidth).Height(m.termHeight)
+
+	return term.Render(ui)
 }
 
 func (m *Model) board() string {
@@ -143,7 +165,7 @@ func tutorialText(key string, instruction string) string {
 	return lipgloss.JoinHorizontal(
 		lipgloss.Left,
 		primaryTextStyle.Copy().Bold(true).Render(key),
-		primaryTextStyle.Copy().Render(" - "),
+		primaryTextStyle.Copy().Render(" "),
 		secondaryTextStyle.Copy().Italic(true).Render(instruction),
 	)
 }

@@ -11,7 +11,7 @@ func main() {
 	game := &Model{}
 	game.new()
 
-	opts := []tea.ProgramOption{tea.WithAltScreen()}
+	opts := []tea.ProgramOption{tea.WithAltScreen(), tea.WithMouseCellMotion()}
 
 	p := tea.NewProgram(game, opts...)
 	if _, err := p.Run(); err != nil {

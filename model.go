@@ -14,6 +14,8 @@ type Status int
 const (
 	GRID_WIDTH  = 13
 	GRID_HEIGHT = 10
+	CELL_WIDTH  = 3
+	CELL_HEIGHT = 1
 	BOMB_COUNT  = (GRID_WIDTH * GRID_HEIGHT) / 4
 )
 
@@ -48,10 +50,16 @@ type Pos struct {
 	y int
 }
 
+type Coords struct {
+	x int
+	y int
+}
+
 type Cell struct {
-	state State
-	value Value
-	pos   Pos
+	state  State
+	value  Value
+	pos    Pos
+	coords Coords
 }
 
 type Model struct {
@@ -94,7 +102,6 @@ func max(a int, b int) int {
 	return a
 }
 
-// TODO: Add mouse support
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case TimerMsg:
@@ -108,6 +115,38 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.termHeight, m.termWidth = msg.Height, msg.Width
 
+	case tea.MouseMsg:
+		switch msg.Button {
+		case tea.MouseButtonLeft:
+			switch msg.Action {
+			case tea.MouseActionPress:
+				for x := 0; x < GRID_HEIGHT; x++ {
+					for y := 0; y < GRID_WIDTH; y++ {
+						xCord := m.cells[x][y].coords.x
+						yCord := m.cells[x][y].coords.y
+						if xCord <= msg.X && msg.X <= xCord+CELL_WIDTH && yCord <= msg.Y && msg.Y <= yCord+CELL_HEIGHT {
+							m.activeCell = &m.cells[x][y]
+							return m.tryOpenActiveCell()
+						}
+					}
+				}
+			}
+		case tea.MouseButtonRight:
+			switch msg.Action {
+			case tea.MouseActionPress:
+				for x := 0; x < GRID_HEIGHT; x++ {
+					for y := 0; y < GRID_WIDTH; y++ {
+						xCord := m.cells[x][y].coords.x
+						yCord := m.cells[x][y].coords.y
+						if xCord <= msg.X && msg.X <= xCord+CELL_WIDTH && yCord <= msg.Y && msg.Y <= yCord+CELL_HEIGHT {
+							m.activeCell = &m.cells[x][y]
+							return m.flagCell()
+						}
+					}
+				}
+			}
+		}
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
@@ -118,78 +157,92 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			curX := m.activeCell.pos.x
 
 			m.activeCell = &m.cells[curX][newY]
+			return m, nil
 
 		case "right", "d":
 			newY := max(m.activeCell.pos.y+1, GRID_WIDTH-1)
 			curX := m.activeCell.pos.x
 
 			m.activeCell = &m.cells[curX][newY]
+			return m, nil
 
 		case "up", "w":
 			newX := min(m.activeCell.pos.x-1, 0)
 			curY := m.activeCell.pos.y
 
 			m.activeCell = &m.cells[newX][curY]
+			return m, nil
 
 		case "down", "s":
 			newX := max(m.activeCell.pos.x+1, GRID_HEIGHT-1)
 			curY := m.activeCell.pos.y
 
 			m.activeCell = &m.cells[newX][curY]
+			return m, nil
 
 		case "enter":
-			if m.status == LOSE {
-				return m, nil
-			}
-
-			if m.activeCell.state == UNOPENED {
-				m.revealCell(m.activeCell)
-			} else if m.activeCell.state == OPENED {
-				var x = m.activeCell.pos.x
-				var y = m.activeCell.pos.y
-
-				for xc := x - 1; xc <= x+1; xc++ {
-					if xc < 0 || xc > GRID_HEIGHT-1 {
-						continue
-					}
-
-					for yc := y - 1; yc <= y+1; yc++ {
-						if yc < 0 || yc > GRID_WIDTH-1 {
-							continue
-						}
-
-						m.revealCell(&m.cells[xc][yc])
-					}
-				}
-			}
-
-			if !m.timerStarted {
-				m.timerStarted = true
-				m.status = PLAY
-				return m, timerCmd
-			} else {
-				return m, nil
-			}
+			return m.tryOpenActiveCell()
 
 		case " ":
-			if m.status == LOSE {
-				return m, nil
-			}
-
-			if m.activeCell.state == UNOPENED {
-				m.activeCell.state = FLAGGED
-				m.bombCounter--
-			} else if m.activeCell.state == FLAGGED {
-				m.activeCell.state = UNOPENED
-				m.bombCounter++
-			}
+			return m.flagCell()
 
 		case "r":
 			m.new()
+			return m, nil
 		}
 	}
 
 	return m, nil
+}
+
+func (m *Model) flagCell() (tea.Model, tea.Cmd) {
+	if m.status == LOSE {
+		return m, nil
+	}
+
+	if m.activeCell.state == UNOPENED {
+		m.activeCell.state = FLAGGED
+		m.bombCounter--
+	} else if m.activeCell.state == FLAGGED {
+		m.activeCell.state = UNOPENED
+		m.bombCounter++
+	}
+	return m, nil
+}
+
+func (m *Model) tryOpenActiveCell() (tea.Model, tea.Cmd) {
+	if m.status == LOSE {
+		return m, nil
+	}
+
+	if m.activeCell.state == UNOPENED {
+		m.revealCell(m.activeCell)
+	} else if m.activeCell.state == OPENED {
+		x := m.activeCell.pos.x
+		y := m.activeCell.pos.y
+
+		for xc := x - 1; xc <= x+1; xc++ {
+			if xc < 0 || xc > GRID_HEIGHT-1 {
+				continue
+			}
+
+			for yc := y - 1; yc <= y+1; yc++ {
+				if yc < 0 || yc > GRID_WIDTH-1 {
+					continue
+				}
+
+				m.revealCell(&m.cells[xc][yc])
+			}
+		}
+	}
+
+	if !m.timerStarted {
+		m.timerStarted = true
+		m.status = PLAY
+		return m, timerCmd
+	} else {
+		return m, nil
+	}
 }
 
 func (m *Model) revealCell(cell *Cell) {
